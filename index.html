@@ -16,7 +16,15 @@
         import { getFirestore, collection, doc, getDoc, setDoc, addDoc, updateDoc, deleteDoc, onSnapshot, query, where } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // Firebase configuration (will be provided by the environment)
-        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+        const firebaseConfig = {
+            apiKey: "AIzaSyDKQEWuE_UxBz4MwTiUKmHzm1_w27R2pWw",
+            authDomain: "finovate-9fed4.firebaseapp.com",
+            projectId: "finovate-9fed4",
+            storageBucket: "finovate-9fed4.firebasestorage.app",
+            messagingSenderId: "638549038731",
+            appId: "1:638549038731:web:10e3eb2b08cb401b7d668e",
+            measurementId: "G-C3C8YQ8YTJ"
+        };        
         const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
 
