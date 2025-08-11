@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Finovate - Personal Finance Manager</title>
+    <!-- Link to external CSS file -->
+    <link rel="stylesheet" href="style.css">
+    <!-- Chart.js library for graphs -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <!-- Login Screen -->
+    <div id="loginScreen" class="login-container">
+        <div class="login-form">
+            <h1>Finovate</h1>
+            <div id="loginForm">
+                <div class="form-group">
+                    <label for="loginUsername">Username</label>
+                    <input type="text" id="loginUsername" placeholder="Enter your username">
+                </div>
+                <div class="form-group">
+                    <label for="loginPassword">Password</label>
+                    <input type="password" id="loginPassword" placeholder="Enter your password">
+                </div>
+                <button class="btn" onclick="login()">Sign In</button>
+                <button class="btn btn-secondary" onclick="showSignup()">Create Account</button>
+            </div>
+            
+            <div id="signupForm" style="display: none;">
+                <div class="form-group">
+                    <label for="signupUsername">Username</label>
+                    <input type="text" id="signupUsername" placeholder="Choose a username">
+                </div>
+                <div class="form-group">
+                    <label for="signupPassword">Password</label>
+                    <input type="password" id="signupPassword" placeholder="Choose a password">
+                </div>
+                <div class="form-group">
+                    <label for="signupEmail">Email</label>
+                    <input type="email" id="signupEmail" placeholder="Enter your email">
+                </div>
+                <button class="btn" onclick="signup()">Create Account</button>
+                <button class="btn btn-secondary" onclick="showLogin()">Back to Sign In</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main App -->
+    <div id="appContainer" class="app-container">
+        <!-- Mobile Overlay -->
+        <div class="sidebar-overlay" id="sidebarOverlay" onclick="closeMobileMenu()"></div>
+        
+        <!-- Sidebar -->
+        <nav class="sidebar" id="sidebar">
+            <div class="logo">
+                <h2>Finovate</h2>
+            </div>
+            <ul class="nav-menu">
+                <li class="nav-item">
+                    <a href="#" class="nav-link active" onclick="showSection('dashboard', event)">
+                        <span>📊</span><span>Dashboard</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="#" class="nav-link" onclick="showSection('transactions', event)">
+                        <span>💳</span><span>Transactions</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="#" class="nav-link" onclick="showSection('budgets', event)">
+                        <span>📈</span><span>Budgets</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="#" class="nav-link" onclick="showSection('goals', event)">
+                        <span>🎯</span><span>Goals</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="#" class="nav-link" onclick="showSection('reports', event)">
+                        <span>📋</span><span>Reports</span>
+                    </a>
+                </li>
+            </ul>
+        </nav>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Header -->
+            <header class="header">
+                <div class="welcome-text">
+                    <h1>Welcome back, <span id="currentUser">User</span>!</h1>
+                    <p>Here's your financial overview</p>
+                </div>
+                <div class="user-info">
+                    <button class="mobile-menu-btn" onclick="toggleMobileMenu()">☰</button>
+                    <button class="logout-btn" onclick="logout()">Logout</button>
+                </div>
+            </header>
+
+            <!-- Dashboard Section -->
+            <section id="dashboard" class="content-section active">
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-value neutral" id="totalBalance">$0.00</div>
+                        <div class="stat-label">Total Balance</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value positive" id="totalIncome">$0.00</div>
+                        <div class="stat-label">Total Income</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value negative" id="totalExpenses">$0.00</div>
+                        <div class="stat-label">Total Expenses</div>
+                    </div>
+                </div>
+
+                <div class="section-card">
+                    <h2 class="section-title">Add Income</h2>
+                    <p style="color: #64748b; margin-bottom: 15px;">Add income to increase your balance. Expenses will automatically reduce your balance.</p>
+                    <div class="form-row">
+                        <input type="number" id="incomeAmount" class="form-control" placeholder="Income Amount" step="0.01">
+                        <input type="text" id="incomeSource" class="form-control" placeholder="Income Source (e.g., Salary, Freelance, Gift)">
+                    </div>
+                    <button class="btn-primary" onclick="addIncome()">Add Income</button>
+                </div>
+
+                <div class="section-card">
+                    <h2 class="section-title">Quick Add Transaction</h2>
+                    <div class="form-row">
+                        <input type="text" id="quickDescription" class="form-control" placeholder="Description">
+                        <input type="number" id="quickAmount" class="form-control" placeholder="Amount" step="0.01">
+                        <select id="quickType" class="form-control">
+                            <option value="income">Income</option>
+                            <option value="expense">Expense</option>
+                        </select>
+                        <select id="quickCategory" class="form-control">
+                            <option value="Food">Food</option>
+                            <option value="Transportation">Transportation</option>
+                            <option value="Entertainment">Entertainment</option>
+                            <option value="Bills">Bills</option>
+                            <option value="Shopping">Shopping</option>
+                            <option value="Healthcare">Healthcare</option>
+                            <option value="Salary">Salary</option>
+                            <option value="Other">Other</option>
+                        </select>
+                    </div>
+                    <button class="btn-primary" onclick="addQuickTransaction()">Add Transaction</button>
+                </div>
+
+                <div class="section-card">
+                    <h2 class="section-title">Recent Transactions</h2>
+                    <div id="recentTransactions" class="transactions-list">
+                        <!-- Recent transactions will be populated here -->
+                    </div>
+                </div>
+            </section>
+
+            <!-- Transactions Section -->
+            <section id="transactions" class="content-section">
+                <div class="section-card">
+                    <h2 class="section-title">All Transactions</h2>
+                    <div id="allTransactions" class="transactions-list">
+                        <!-- All transactions will be populated here -->
+                    </div>
+                </div>
+            </section>
+
+            <!-- Budgets Section -->
+            <section id="budgets" class="content-section">
+                <div class="section-card">
+                    <h2 class="section-title">Monthly Budgets</h2>
+                    <div class="form-row">
+                        <select id="budgetCategory" class="form-control">
+                            <option value="Food">Food</option>
+                            <option value="Transportation">Transportation</option>
+                            <option value="Entertainment">Entertainment</option>
+                            <option value="Bills">Bills</option>
+                            <option value="Shopping">Shopping</option>
+                            <option value="Healthcare">Healthcare</option>
+                            <option value="Other">Other</option>
+                        </select>
+                        <input type="number" id="budgetAmount" class="form-control" placeholder="Budget Amount" step="0.01">
+                    </div>
+                    <button class="btn-primary" onclick="addBudget()">Set Budget</button>
+                    <div id="budgetsList" style="margin-top: 20px;">
+                        <!-- Budgets will be populated here -->
+                    </div>
+                </div>
+            </section>
+
+            <!-- Goals Section -->
+            <section id="goals" class="content-section">
+                <div class="section-card">
+                    <h2 class="section-title">Savings Goals</h2>
+                    <div class="form-row">
+                        <input type="text" id="goalName" class="form-control" placeholder="Goal Name">
+                        <input type="number" id="goalAmount" class="form-control" placeholder="Target Amount" step="0.01">
+                        <input type="date" id="goalDeadline" class="form-control">
+                    </div>
+                    <button class="btn-primary" onclick="addGoal()">Create Goal</button>
+                </div>
+                <div id="goalsList" class="goals-grid">
+                    <!-- Goals will be populated here -->
+                </div>
+            </section>
+
+            <!-- Reports Section -->
+            <section id="reports" class="content-section">
+                <div class="section-card">
+                    <h2 class="section-title">Expense Categories</h2>
+                    <div class="chart-container">
+                        <canvas id="expenseChart" class="chart-canvas"></canvas>
+                    </div>
+                </div>
+                <div class="section-card">
+                    <h2 class="section-title">Income vs Expenses Over Time</h2>
+                    <div class="chart-container">
+                        <canvas id="incomeExpenseChart" class="chart-canvas"></canvas>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Notification Popup -->
+    <div id="popupNotification" class="popup-notification">
+        <p id="popupMessage"></p>
+    </div>
+
+    <!-- Link to external JavaScript file -->
+    <script src="script.js"></script>
+</body>
+</html>

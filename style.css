@@ -1,0 +1,527 @@
+/* Universal box-sizing for consistent layout */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+/* Body styling for overall look and feel */
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    min-height: 100vh;
+    color: #333;
+    /* Removed parallax-specific width, height, and overflow from here */
+}
+
+/* Login screen container styling */
+.login-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    padding: 20px;
+}
+
+/* Login/Signup form styling */
+.login-form {
+    background: white;
+    padding: 40px;
+    border-radius: 20px;
+    box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+    width: 100%;
+    max-width: 400px;
+    text-align: center;
+    /* Added for individual parallax effect */
+    transition: transform 0.1s ease-out;
+    position: relative;
+}
+
+/* Heading for login/signup forms */
+.login-form h1 {
+    color: #667eea;
+    margin-bottom: 30px;
+    font-size: 2.5rem;
+    font-weight: 700;
+}
+
+/* Form group for labels and inputs */
+.form-group {
+    margin-bottom: 20px;
+    text-align: left;
+}
+
+/* Label styling within form groups */
+.form-group label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: 600;
+    color: #555;
+}
+
+/* Input field styling within form groups */
+.form-group input {
+    width: 100%;
+    padding: 12px 16px;
+    border: 2px solid #e1e5e9;
+    border-radius: 10px;
+    font-size: 16px;
+    transition: border-color 0.3s;
+}
+
+/* Input focus state */
+.form-group input:focus {
+    outline: none;
+    border-color: #667eea;
+}
+
+/* General button styling */
+.btn {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border: none;
+    padding: 12px 30px;
+    border-radius: 10px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: transform 0.2s;
+    width: 100%;
+    margin-bottom: 15px;
+}
+
+/* Button hover effect */
+.btn:hover {
+    transform: translateY(-2px);
+}
+
+/* Secondary button styling */
+.btn-secondary {
+    background: transparent;
+    color: #667eea;
+    border: 2px solid #667eea;
+}
+
+/* Main application container styling */
+.app-container {
+    display: none; /* Hidden by default, shown after login */
+    min-height: 100vh;
+    background: #f8fafc;
+    /* Removed parallax-specific styles from here */
+}
+
+/* Sidebar navigation styling */
+.sidebar {
+    position: fixed;
+    left: 0;
+    top: 0;
+    width: 280px;
+    height: 100vh;
+    background: white;
+    box-shadow: 2px 0 10px rgba(0,0,0,0.1);
+    padding: 30px 0;
+    z-index: 1000;
+}
+
+/* Logo within the sidebar */
+.logo {
+    text-align: center;
+    margin-bottom: 40px;
+    padding: 0 30px;
+}
+
+/* Logo heading */
+.logo h2 {
+    color: #667eea;
+    font-size: 1.8rem;
+    font-weight: 700;
+}
+
+/* Navigation menu list */
+.nav-menu {
+    list-style: none;
+}
+
+/* Navigation item spacing */
+.nav-item {
+    margin-bottom: 5px;
+}
+
+/* Navigation link styling */
+.nav-link {
+    display: flex;
+    align-items: center;
+    padding: 15px 30px;
+    color: #64748b;
+    text-decoration: none;
+    transition: all 0.3s;
+    font-weight: 500;
+}
+
+/* Navigation link hover and active states */
+.nav-link:hover, .nav-link.active {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+}
+
+/* Spacing for icons/emojis in nav links */
+.nav-link span {
+    margin-left: 12px;
+}
+
+/* Main content area styling */
+.main-content {
+    margin-left: 280px; /* Offset by sidebar width */
+    padding: 30px;
+    min-height: 100vh;
+}
+
+/* Header section styling */
+.header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 30px;
+    background: white;
+    padding: 20px 30px;
+    border-radius: 15px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+}
+
+/* Welcome text in header */
+.welcome-text h1 {
+    color: #1e293b;
+    font-size: 2rem;
+    margin-bottom: 5px;
+}
+
+/* Welcome text paragraph */
+.welcome-text p {
+    color: #64748b;
+}
+
+/* User info section in header */
+.user-info {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+/* Logout button styling */
+.logout-btn {
+    background: #ef4444;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 500;
+}
+
+/* Stats grid layout */
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 20px;
+    margin-bottom: 30px;
+}
+
+/* Individual stat card styling */
+.stat-card {
+    background: white;
+    padding: 25px;
+    border-radius: 15px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+    text-align: center;
+    /* Added for individual parallax effect */
+    transition: transform 0.1s ease-out;
+    position: relative;
+}
+
+/* Stat value text styling */
+.stat-value {
+    font-size: 2.5rem;
+    font-weight: 700;
+    margin-bottom: 5px;
+}
+
+/* Color for positive stat values (income) */
+.stat-value.positive { color: #10b981; }
+/* Color for negative stat values (expenses) */
+.stat-value.negative { color: #ef4444; }
+/* Color for neutral stat values (balance) */
+.stat-value.neutral { color: #667eea; }
+
+/* Stat label text styling */
+.stat-label {
+    color: #64748b;
+    font-weight: 500;
+}
+
+/* Content section display control */
+.content-section {
+    display: none; /* Hidden by default */
+}
+
+/* Active content section display */
+.content-section.active {
+    display: block;
+}
+
+/* General section card styling */
+.section-card {
+    background: white;
+    padding: 30px;
+    border-radius: 15px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+    margin-bottom: 20px;
+    /* Added for individual parallax effect */
+    transition: transform 0.1s ease-out;
+    position: relative;
+}
+
+/* Section title styling */
+.section-title {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #1e293b;
+    margin-bottom: 20px;
+}
+
+/* Form row layout */
+.form-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 15px;
+    margin-bottom: 20px;
+}
+
+/* Form control (input, select) styling */
+.form-control {
+    padding: 12px 16px;
+    border: 2px solid #e2e8f0;
+    border-radius: 10px;
+    font-size: 14px;
+}
+
+/* Form control focus state */
+.form-control:focus {
+    outline: none;
+    border-color: #667eea;
+}
+
+/* Primary button styling */
+.btn-primary {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border: none;
+    padding: 12px 24px;
+    border-radius: 10px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+/* Transactions list container */
+.transactions-list {
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+/* Individual transaction item styling */
+.transaction-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 15px;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+/* Transaction info section */
+.transaction-info h4 {
+    color: #1e293b;
+    margin-bottom: 5px;
+}
+
+/* Transaction info paragraph */
+.transaction-info p {
+    color: #64748b;
+    font-size: 14px;
+}
+
+/* Transaction amount styling */
+.transaction-amount {
+    font-weight: 700;
+    font-size: 1.1rem;
+}
+
+/* Color for income amounts */
+.transaction-amount.income { color: #10b981; }
+/* Color for expense amounts */
+.transaction-amount.expense { color: #ef4444; }
+
+/* Chart container styling */
+.chart-container {
+    position: relative;
+    height: 400px;
+    width: 100%;
+    margin-top: 20px;
+    background: #f8fafc;
+    border-radius: 10px;
+    padding: 20px;
+    border: 2px solid #e2e8f0;
+}
+
+/* Chart canvas sizing */
+.chart-canvas {
+    width: 100% !important;
+    height: 100% !important;
+    max-width: 100%;
+    max-height: 100%;
+}
+
+/* Goals grid layout */
+.goals-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 20px;
+}
+
+/* Individual goal card styling */
+.goal-card {
+    background: white;
+    padding: 20px;
+    border-radius: 15px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+    /* Added for individual parallax effect */
+    transition: transform 0.1s ease-out;
+    position: relative;
+}
+
+/* Goal progress bar container */
+.goal-progress {
+    width: 100%;
+    height: 8px;
+    background: #e2e8f0;
+    border-radius: 4px;
+    margin: 15px 0;
+    overflow: hidden;
+}
+
+/* Goal progress bar fill */
+.goal-progress-bar {
+    height: 100%;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    transition: width 0.3s;
+}
+
+/* Delete button styling */
+.delete-btn {
+    background: #ef4444;
+    color: white;
+    border: none;
+    padding: 6px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 12px;
+    margin-left: 10px;
+}
+
+/* Mobile menu button styling */
+.mobile-menu-btn {
+    display: none; /* Hidden on desktop */
+    background: #667eea;
+    color: white;
+    border: none;
+    padding: 10px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 18px;
+}
+
+/* Sidebar open state for mobile */
+.sidebar.mobile-open {
+    transform: translateX(0);
+}
+
+/* Overlay for mobile menu */
+.sidebar-overlay {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.5);
+    z-index: 999;
+}
+
+/* Notification Popup styling */
+.popup-notification {
+    position: fixed;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background-color: #10b981; /* Default green for success */
+    color: white;
+    padding: 15px 30px;
+    border-radius: 10px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+    z-index: 2000;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.3s ease-in-out, visibility 0.3s ease-in-out;
+    font-weight: 600;
+}
+
+/* Class to show the popup */
+.popup-notification.show {
+    opacity: 1;
+    visibility: visible;
+}
+
+/* Error state for popup */
+.popup-notification.error {
+    background-color: #f44336; /* Red for errors */
+}
+
+/* Media queries for responsive design */
+@media (max-width: 768px) {
+    .mobile-menu-btn {
+        display: block;
+    }
+
+    .sidebar {
+        transform: translateX(-100%); /* Hide sidebar off-screen */
+        transition: transform 0.3s;
+        z-index: 1001;
+    }
+    
+    .main-content {
+        margin-left: 0; /* Remove left margin on small screens */
+        padding: 20px;
+    }
+    
+    .stats-grid {
+        grid-template-columns: 1fr; /* Stack stats vertically */
+    }
+    
+    .form-row {
+        grid-template-columns: 1fr; /* Stack form fields vertically */
+    }
+
+    .header {
+        flex-direction: column; /* Stack header items vertically */
+        gap: 15px;
+        align-items: flex-start;
+    }
+
+    .user-info {
+        width: 100%;
+        justify-content: space-between;
+    }
+
+    .chart-container {
+        height: 300px; /* Adjust chart height for mobile */
+        padding: 15px;
+    }
+}
