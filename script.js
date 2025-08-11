@@ -1,14 +1,74 @@
-// Global variables to store application data
-let currentUser = null;
+// Global variables for Firebase instances and app data
+let firebaseApp;
+let firebaseAuth;
+let firebaseDb;
+let currentUserId = null; // Stores Firebase User ID
+let currentDisplayName = "User"; // Stores user's chosen display name
 let transactions = [];
 let budgets = [];
 let goals = [];
 let expenseChart = null;
 let incomeExpenseChart = null;
 
-// Initialize app when the DOM is fully loaded
+// --- Firebase Initialization and Authentication Setup ---
+
+// This code runs after the DOM is loaded and Firebase SDKs are imported
 document.addEventListener('DOMContentLoaded', function() {
-    checkLoginStatus();
+    // Access Firebase instances made available by the <script type="module"> in index.html
+    firebaseApp = window.firebaseApp;
+    firebaseAuth = window.firebaseAuth;
+    firebaseDb = window.firebaseDb;
+    const initialAuthToken = window.initialAuthToken;
+    const appId = window.appId; // Access the global appId
+
+    // Listen for authentication state changes
+    window.onAuthStateChanged(firebaseAuth, async (user) => {
+        if (user) {
+            // User is signed in.
+            currentUserId = user.uid;
+            // Fetch display name from Firestore or use email if not set
+            const userDocRef = window.doc(firebaseDb, `artifacts/${appId}/users/${currentUserId}/data/profile`);
+            const userDocSnap = await window.getDoc(userDocRef);
+            if (userDocSnap.exists()) {
+                currentDisplayName = userDocSnap.data().displayName || user.email;
+            } else {
+                currentDisplayName = user.email || "User";
+            }
+            showApp();
+        } else {
+            // User is signed out.
+            currentUserId = null;
+            currentDisplayName = "User";
+            showLoginScreen();
+
+            // Attempt anonymous sign-in if in Canvas environment and token is available
+            if (initialAuthToken) {
+                try {
+                    await window.signInWithCustomToken(firebaseAuth, initialAuthToken);
+                    console.log("Signed in anonymously with custom token.");
+                } catch (error) {
+                    console.error("Error signing in anonymously with custom token:", error);
+                    // Fallback to anonymous sign-in if custom token fails or is not provided
+                    try {
+                        await window.signInAnonymously(firebaseAuth);
+                        console.log("Signed in anonymously.");
+                    } catch (anonError) {
+                        console.error("Error signing in anonymously:", anonError);
+                        showPopup("Authentication failed. Please try again.", "error");
+                    }
+                }
+            } else {
+                // Regular anonymous sign-in for non-Canvas environments or if token is absent
+                try {
+                    await window.signInAnonymously(firebaseAuth);
+                    console.log("Signed in anonymously.");
+                } catch (anonError) {
+                    console.error("Error signing in anonymously:", anonError);
+                    showPopup("Authentication failed. Please try again.", "error");
+                }
+            }
+        }
+    });
 });
 
 // --- Authentication Functions ---
@@ -30,193 +90,198 @@ function showLogin() {
 }
 
 /**
- * Handles user signup. Stores user credentials in localStorage.
+ * Shows the login screen and hides the app container.
  */
-function signup() {
-    const username = document.getElementById('signupUsername').value;
-    const password = document.getElementById('signupPassword').value;
-    const email = document.getElementById('signupEmail').value;
+function showLoginScreen() {
+    document.getElementById('loginScreen').style.display = 'flex';
+    document.getElementById('appContainer').style.display = 'none';
+}
 
-    if (!username || !password || !email) {
+/**
+ * Handles user signup using Firebase Email/Password Authentication.
+ * Stores user's display name in Firestore.
+ */
+async function signup() {
+    const displayName = document.getElementById('signupUsername').value;
+    const email = document.getElementById('signupEmail').value;
+    const password = document.getElementById('signupPassword').value;
+
+    if (!displayName || !email || !password) {
         showPopup('Please fill in all fields', 'error');
         return;
     }
 
-    // Check if user already exists
-    const existingUsers = JSON.parse(localStorage.getItem('finovate_users') || '{}');
-    if (existingUsers[username]) {
-        showPopup('Username already exists', 'error');
-        return;
+    try {
+        const userCredential = await window.createUserWithEmailAndPassword(firebaseAuth, email, password);
+        const user = userCredential.user;
+
+        // Save display name to Firestore
+        const userProfileRef = window.doc(firebaseDb, `artifacts/${window.appId}/users/${user.uid}/data/profile`);
+        await window.setDoc(userProfileRef, {
+            displayName: displayName,
+            email: email,
+            createdAt: new Date().toISOString()
+        });
+
+        showPopup('Account created successfully! Please sign in.', 'success');
+        showLogin();
+    } catch (error) {
+        console.error("Signup error:", error);
+        let errorMessage = "Failed to create account.";
+        if (error.code === 'auth/email-already-in-use') {
+            errorMessage = "Email already in use. Try logging in or reset password.";
+        } else if (error.code === 'auth/invalid-email') {
+            errorMessage = "Invalid email address.";
+        } else if (error.code === 'auth/weak-password') {
+            errorMessage = "Password is too weak (min 6 characters).";
+        }
+        showPopup(errorMessage, 'error');
     }
-
-    // Create new user object
-    existingUsers[username] = {
-        password: password,
-        email: email,
-        createdAt: new Date().toISOString()
-    };
-
-    localStorage.setItem('finovate_users', JSON.stringify(existingUsers));
-    showPopup('Account created successfully! Please sign in.', 'success');
-    showLogin();
 }
 
 /**
- * Handles user login. Authenticates against localStorage.
+ * Handles user login using Firebase Email/Password Authentication.
  */
-function login() {
-    const username = document.getElementById('loginUsername').value;
+async function login() {
+    const email = document.getElementById('loginEmail').value;
     const password = document.getElementById('loginPassword').value;
 
-    if (!username || !password) {
-        showPopup('Please enter username and password', 'error');
+    if (!email || !password) {
+        showPopup('Please enter email and password', 'error');
         return;
     }
 
-    const users = JSON.parse(localStorage.getItem('finovate_users') || '{}');
-    if (users[username] && users[username].password === password) {
-        currentUser = username;
-        localStorage.setItem('finovate_current_user', username);
-        showApp();
-    } else {
-        showPopup('Invalid username or password', 'error');
+    try {
+        await window.signInWithEmailAndPassword(firebaseAuth, email, password);
+        // onAuthStateChanged listener will handle showing the app
+        showPopup('Logged in successfully!', 'success');
+    } catch (error) {
+        console.error("Login error:", error);
+        let errorMessage = "Login failed. Invalid credentials.";
+        if (error.code === 'auth/invalid-email' || error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password') {
+            errorMessage = "Invalid email or password.";
+        }
+        showPopup(errorMessage, 'error');
     }
 }
 
 /**
- * Logs out the current user and returns to the login screen.
+ * Logs out the current user using Firebase signOut.
  */
-function logout() {
-    currentUser = null;
-    localStorage.removeItem('finovate_current_user');
-    document.getElementById('loginScreen').style.display = 'flex';
-    document.getElementById('appContainer').style.display = 'none';
-    showLogin();
-    showPopup('Logged out successfully!', 'success');
-}
-
-/**
- * Checks if a user is already logged in from a previous session.
- */
-function checkLoginStatus() {
-    const savedUser = localStorage.getItem('finovate_current_user');
-    if (savedUser) {
-        currentUser = savedUser;
-        showApp();
+async function logout() {
+    try {
+        await window.signOut(firebaseAuth);
+        // onAuthStateChanged listener will handle showing login screen
+        showPopup('Logged out successfully!', 'success');
+    } catch (error) {
+        console.error("Logout error:", error);
+        showPopup("Failed to log out. Please try again.", "error");
     }
 }
 
 /**
  * Displays the main application interface after successful login.
- * Loads user data and updates all sections.
+ * Sets up Firestore real-time listeners for user data.
  */
 function showApp() {
     document.getElementById('loginScreen').style.display = 'none';
     document.getElementById('appContainer').style.display = 'block';
-    document.getElementById('currentUser').textContent = currentUser;
-    loadUserData();
+    document.getElementById('currentUser').textContent = currentDisplayName;
+
+    // Clear previous data and listeners to avoid duplicates if user logs out/in
+    transactions = [];
+    budgets = [];
+    goals = [];
+    if (expenseChart) expenseChart.destroy();
+    if (incomeExpenseChart) incomeExpenseChart.destroy();
+
+    // Set up real-time listeners for user-specific data
+    setupFirestoreListeners();
+
+    // Initial UI updates (data will be populated by listeners)
     updateDashboard();
     updateTransactionsList();
     updateBudgetsList();
     updateGoalsList();
     
-    // Initialize charts with a slight delay to ensure DOM elements are rendered
+    // Initialize charts with a slight delay to ensure DOM is ready
     setTimeout(() => {
         initializeCharts();
     }, 100);
 }
 
-// --- Navigation Functions ---
+// --- Firestore Data Listeners ---
 
 /**
- * Displays the selected content section and updates the active navigation link.
- * @param {string} sectionName - The ID of the section to display.
- * @param {Event} event - The click event object.
+ * Sets up real-time Firestore listeners for transactions, budgets, and goals.
+ * Data changes in the database will automatically update the local arrays and UI.
  */
-function showSection(sectionName, event) {
-    if (event) {
-        event.preventDefault(); // Prevent default link behavior
+function setupFirestoreListeners() {
+    if (!currentUserId) {
+        console.warn("No authenticated user to set up listeners for.");
+        return;
     }
 
-    // Hide all content sections
-    const sections = document.querySelectorAll('.content-section');
-    sections.forEach(section => section.classList.remove('active'));
+    const userBaseRef = `artifacts/${window.appId}/users/${currentUserId}/data`;
 
-    // Show the selected section
-    document.getElementById(sectionName).classList.add('active');
+    // Transactions Listener
+    window.onSnapshot(window.collection(firebaseDb, `${userBaseRef}/transactions`), (snapshot) => {
+        const fetchedTransactions = [];
+        snapshot.forEach(doc => {
+            fetchedTransactions.push({ id: doc.id, ...doc.data() });
+        });
+        // Sort by date (most recent first) and then by ID (for stable order if dates are same)
+        transactions = fetchedTransactions.sort((a, b) => {
+            if (a.date < b.date) return 1;
+            if (a.date > b.date) return -1;
+            return b.id - a.id; // Secondary sort for stable order
+        });
+        console.log("Transactions updated:", transactions);
+        updateDashboard();
+        updateTransactionsList();
+        refreshCharts();
+    }, (error) => {
+        console.error("Error fetching transactions:", error);
+        showPopup("Failed to load transactions.", "error");
+    });
 
-    // Update active navigation link styling
-    const navLinks = document.querySelectorAll('.nav-link');
-    navLinks.forEach(link => link.classList.remove('active'));
-    if (event) {
-        event.target.closest('.nav-link').classList.add('active');
-    } else {
-        // Fallback if event is not provided (e.g., initial load)
-        document.querySelector(`.nav-link[onclick*='${sectionName}']`).classList.add('active');
-    }
+    // Budgets Listener
+    window.onSnapshot(window.collection(firebaseDb, `${userBaseRef}/budgets`), (snapshot) => {
+        const fetchedBudgets = [];
+        snapshot.forEach(doc => {
+            fetchedBudgets.push({ id: doc.id, ...doc.data() });
+        });
+        budgets = fetchedBudgets;
+        console.log("Budgets updated:", budgets);
+        updateBudgetsList();
+    }, (error) => {
+        console.error("Error fetching budgets:", error);
+        showPopup("Failed to load budgets.", "error");
+    });
 
-    // Close mobile menu if open
-    closeMobileMenu();
-
-    // Refresh charts when reports section is activated
-    if (sectionName === 'reports') {
-        setTimeout(() => {
-            refreshCharts();
-        }, 200);
-    }
+    // Goals Listener
+    window.onSnapshot(window.collection(firebaseDb, `${userBaseRef}/goals`), (snapshot) => {
+        const fetchedGoals = [];
+        snapshot.forEach(doc => {
+            fetchedGoals.push({ id: doc.id, ...doc.data() });
+        });
+        goals = fetchedGoals;
+        console.log("Goals updated:", goals);
+        updateGoalsList();
+    }, (error) => {
+        console.error("Error fetching goals:", error);
+        showPopup("Failed to load goals.", "error");
+    });
 }
 
-// --- Data Management Functions ---
+// --- Data Operations (CRUD) with Firestore ---
 
 /**
- * Loads user-specific financial data from localStorage.
+ * Adds a new quick transaction (income or expense) to Firestore.
  */
-function loadUserData() {
-    const userKey = `finovate_${currentUser}`;
-    const userData = JSON.parse(localStorage.getItem(userKey) || '{}');
-    
-    transactions = userData.transactions || [];
-    budgets = userData.budgets || [];
-    goals = userData.goals || [];
-}
+async function addQuickTransaction() {
+    if (!currentUserId) { showPopup("Please log in to add transactions.", "error"); return; }
 
-/**
- * Saves current user's financial data to localStorage.
- */
-function saveUserData() {
-    const userKey = `finovate_${currentUser}`;
-    const userData = {
-        transactions: transactions,
-        budgets: budgets,
-        goals: goals
-    };
-    localStorage.setItem(userKey, JSON.stringify(userData));
-}
-
-/**
- * Displays a temporary notification pop-up.
- * @param {string} message - The message to display.
- * @param {string} type - 'success' or 'error' to control styling.
- */
-function showPopup(message, type = 'success') {
-    const popup = document.getElementById('popupNotification');
-    const messageElement = document.getElementById('popupMessage');
-    
-    messageElement.textContent = message;
-    popup.classList.remove('success', 'error'); // Remove previous types
-    popup.classList.add(type, 'show'); // Add current type and show class
-
-    setTimeout(() => {
-        popup.classList.remove('show'); // Hide after 3 seconds
-    }, 3000); 
-}
-
-// --- Transaction Functions ---
-
-/**
- * Adds a new quick transaction (income or expense).
- */
-function addQuickTransaction() {
     const description = document.getElementById('quickDescription').value;
     const amount = parseFloat(document.getElementById('quickAmount').value);
     const type = document.getElementById('quickType').value;
@@ -227,47 +292,49 @@ function addQuickTransaction() {
         return;
     }
 
-    const transaction = {
-        id: Date.now(), // Unique ID for the transaction
+    const transactionData = {
         description: description,
         amount: amount,
         type: type,
         category: category,
-        date: new Date().toISOString().split('T')[0] // YYYY-MM-DD format
+        date: new Date().toISOString().split('T')[0],
+        timestamp: window.serverTimestamp ? window.serverTimestamp() : new Date() // Use server timestamp if available
     };
 
-    transactions.unshift(transaction); // Add to the beginning of the array
-    saveUserData();
-    updateDashboard();
-    updateTransactionsList();
-    refreshCharts();
-
-    // Clear form fields
-    document.getElementById('quickDescription').value = '';
-    document.getElementById('quickAmount').value = '';
-
-    showPopup(`Transaction '${description}' added successfully!`, 'success');
+    try {
+        await window.addDoc(window.collection(firebaseDb, `artifacts/${window.appId}/users/${currentUserId}/data/transactions`), transactionData);
+        showPopup(`Transaction '${description}' added successfully!`, 'success');
+        // Clear form fields after successful add
+        document.getElementById('quickDescription').value = '';
+        document.getElementById('quickAmount').value = '';
+    } catch (error) {
+        console.error("Error adding transaction:", error);
+        showPopup("Failed to add transaction.", "error");
+    }
 }
 
 /**
- * Deletes a transaction by its ID.
- * @param {number} id - The ID of the transaction to delete.
+ * Deletes a transaction from Firestore by its ID.
+ * @param {string} id - The Firestore document ID of the transaction to delete.
  */
-function deleteTransaction(id) {
-    transactions = transactions.filter(t => t.id !== id);
-    saveUserData();
-    updateDashboard();
-    updateTransactionsList();
-    refreshCharts();
-    showPopup('Transaction deleted successfully.', 'success');
+async function deleteTransaction(id) {
+    if (!currentUserId) { showPopup("Please log in to delete transactions.", "error"); return; }
+    
+    try {
+        await window.deleteDoc(window.doc(firebaseDb, `artifacts/${window.appId}/users/${currentUserId}/data/transactions`, id));
+        showPopup('Transaction deleted successfully.', 'success');
+    } catch (error) {
+        console.error("Error deleting transaction:", error);
+        showPopup("Failed to delete transaction.", "error");
+    }
 }
 
-// --- Budget Functions ---
-
 /**
- * Adds or updates a monthly budget for a specific category.
+ * Adds or updates a monthly budget for a specific category in Firestore.
  */
-function addBudget() {
+async function addBudget() {
+    if (!currentUserId) { showPopup("Please log in to set budgets.", "error"); return; }
+
     const category = document.getElementById('budgetCategory').value;
     const amount = parseFloat(document.getElementById('budgetAmount').value);
 
@@ -276,44 +343,50 @@ function addBudget() {
         return;
     }
 
-    // Remove existing budget for this category to allow updates
-    budgets = budgets.filter(b => b.category !== category);
-
-    const budget = {
-        id: Date.now(),
+    const budgetData = {
         category: category,
         amount: amount,
         month: new Date().getMonth(),
-        year: new Date().getFullYear()
+        year: new Date().getFullYear(),
+        updatedAt: window.serverTimestamp ? window.serverTimestamp() : new Date()
     };
 
-    budgets.push(budget);
-    saveUserData();
-    updateBudgetsList();
-
-    // Clear form field
-    document.getElementById('budgetAmount').value = '';
-
-    showPopup(`Budget for ${category} set to $${amount.toFixed(2)} successfully!`, 'success');
+    try {
+        // Use setDoc with a specific ID to overwrite if budget for category already exists
+        // For simplicity, we'll use category name as doc ID (or a hash of it)
+        // A better approach might be to query and then update/add. For now, we'll use category as ID.
+        const budgetDocRef = window.doc(firebaseDb, `artifacts/${window.appId}/users/${currentUserId}/data/budgets`, category);
+        await window.setDoc(budgetDocRef, budgetData);
+        showPopup(`Budget for ${category} set to $${amount.toFixed(2)} successfully!`, 'success');
+        document.getElementById('budgetAmount').value = '';
+    } catch (error) {
+        console.error("Error setting budget:", error);
+        showPopup("Failed to set budget.", "error");
+    }
 }
 
 /**
- * Deletes a budget by its ID.
- * @param {number} id - The ID of the budget to delete.
+ * Deletes a budget from Firestore by its ID (which is the category name).
+ * @param {string} id - The Firestore document ID (category name) of the budget to delete.
  */
-function deleteBudget(id) {
-    budgets = budgets.filter(b => b.id !== id);
-    saveUserData();
-    updateBudgetsList();
-    showPopup('Budget deleted successfully.', 'success');
+async function deleteBudget(id) {
+    if (!currentUserId) { showPopup("Please log in to delete budgets.", "error"); return; }
+    
+    try {
+        await window.deleteDoc(window.doc(firebaseDb, `artifacts/${window.appId}/users/${currentUserId}/data/budgets`, id));
+        showPopup('Budget deleted successfully.', 'success');
+    } catch (error) {
+        console.error("Error deleting budget:", error);
+        showPopup("Failed to delete budget.", "error");
+    }
 }
 
-// --- Goal Functions ---
-
 /**
- * Adds a new savings goal.
+ * Adds a new savings goal to Firestore.
  */
-function addGoal() {
+async function addGoal() {
+    if (!currentUserId) { showPopup("Please log in to create goals.", "error"); return; }
+
     const name = document.getElementById('goalName').value;
     const amount = parseFloat(document.getElementById('goalAmount').value);
     const deadline = document.getElementById('goalDeadline').value;
@@ -323,66 +396,82 @@ function addGoal() {
         return;
     }
 
-    const goal = {
-        id: Date.now(),
+    const goalData = {
         name: name,
         targetAmount: amount,
         currentAmount: 0, // Starts at 0
         deadline: deadline,
-        createdAt: new Date().toISOString()
+        createdAt: new Date().toISOString(),
+        updatedAt: window.serverTimestamp ? window.serverTimestamp() : new Date()
     };
 
-    goals.push(goal);
-    saveUserData();
-    updateGoalsList();
-
-    // Clear form fields
-    document.getElementById('goalName').value = '';
-    document.getElementById('goalAmount').value = '';
-    document.getElementById('goalDeadline').value = '';
-
-    showPopup(`Savings goal for '${name}' created successfully!`, 'success');
+    try {
+        await window.addDoc(window.collection(firebaseDb, `artifacts/${window.appId}/users/${currentUserId}/data/goals`), goalData);
+        showPopup(`Savings goal for '${name}' created successfully!`, 'success');
+        document.getElementById('goalName').value = '';
+        document.getElementById('goalAmount').value = '';
+        document.getElementById('goalDeadline').value = '';
+    } catch (error) {
+        console.error("Error adding goal:", error);
+        showPopup("Failed to create goal.", "error");
+    }
 }
 
 /**
- * Deletes a savings goal by its ID.
- * @param {number} id - The ID of the goal to delete.
+ * Deletes a savings goal from Firestore by its ID.
+ * @param {string} id - The Firestore document ID of the goal to delete.
  */
-function deleteGoal(id) {
-    goals = goals.filter(g => g.id !== id);
-    saveUserData();
-    updateGoalsList();
-    showPopup('Goal deleted successfully.', 'success');
+async function deleteGoal(id) {
+    if (!currentUserId) { showPopup("Please log in to delete goals.", "error"); return; }
+    
+    try {
+        await window.deleteDoc(window.doc(firebaseDb, `artifacts/${window.appId}/users/${currentUserId}/data/goals`, id));
+        showPopup('Goal deleted successfully.', 'success');
+    } catch (error) {
+        console.error("Error deleting goal:", error);
+        showPopup("Failed to delete goal.", "error");
+    }
 }
 
 /**
- * Adds an amount to a specific savings goal.
- * @param {number} id - The ID of the goal to update.
+ * Adds an amount to a specific savings goal in Firestore.
+ * @param {string} id - The Firestore document ID of the goal to update.
  * @param {number} amount - The amount to add to the goal.
  */
-function addToGoal(id, amount) {
+async function addToGoal(id, amount) {
+    if (!currentUserId) { showPopup("Please log in to update goals.", "error"); return; }
+
     if (isNaN(amount) || amount <= 0) {
         showPopup('Please enter a valid amount to add to the goal.', 'error');
         return;
     }
 
-    const goal = goals.find(g => g.id === id);
-    if (goal) {
-        goal.currentAmount += amount;
-        saveUserData();
-        updateGoalsList();
-        showPopup(`Added $${amount.toFixed(2)} to goal '${goal.name}'.`, 'success');
-    } else {
-        showPopup('Goal not found.', 'error');
+    try {
+        const goalRef = window.doc(firebaseDb, `artifacts/${window.appId}/users/${currentUserId}/data/goals`, id);
+        const goalSnap = await window.getDoc(goalRef);
+
+        if (goalSnap.exists()) {
+            const currentAmount = goalSnap.data().currentAmount || 0;
+            await window.updateDoc(goalRef, {
+                currentAmount: currentAmount + amount,
+                updatedAt: window.serverTimestamp ? window.serverTimestamp() : new Date()
+            });
+            showPopup(`Added $${amount.toFixed(2)} to goal '${goalSnap.data().name}'.`, 'success');
+        } else {
+            showPopup('Goal not found.', 'error');
+        }
+    } catch (error) {
+        console.error("Error adding to goal:", error);
+        showPopup("Failed to update goal.", "error");
     }
 }
 
-// --- Income Addition Function (Specific to Dashboard) ---
-
 /**
- * Adds a new income transaction.
+ * Adds a new income transaction to Firestore.
  */
-function addIncome() {
+async function addIncome() {
+    if (!currentUserId) { showPopup("Please log in to add income.", "error"); return; }
+
     const amount = parseFloat(document.getElementById('incomeAmount').value);
     const source = document.getElementById('incomeSource').value;
 
@@ -396,29 +485,27 @@ function addIncome() {
         return;
     }
 
-    const transaction = {
-        id: Date.now(),
+    const transactionData = {
         description: source,
         amount: amount,
         type: 'income',
         category: 'Income', // Default category for income
-        date: new Date().toISOString().split('T')[0]
+        date: new Date().toISOString().split('T')[0],
+        timestamp: window.serverTimestamp ? window.serverTimestamp() : new Date()
     };
 
-    transactions.unshift(transaction);
-    saveUserData();
-    updateDashboard();
-    updateTransactionsList();
-    refreshCharts();
-
-    // Clear form fields
-    document.getElementById('incomeAmount').value = '';
-    document.getElementById('incomeSource').value = '';
-
-    showPopup(`Income of $${amount.toFixed(2)} added successfully!`, 'success');
+    try {
+        await window.addDoc(window.collection(firebaseDb, `artifacts/${window.appId}/users/${currentUserId}/data/transactions`), transactionData);
+        showPopup(`Income of $${amount.toFixed(2)} added successfully!`, 'success');
+        document.getElementById('incomeAmount').value = '';
+        document.getElementById('incomeSource').value = '';
+    } catch (error) {
+        console.error("Error adding income:", error);
+        showPopup("Failed to add income.", "error");
+    }
 }
 
-// --- UI Update Functions ---
+// --- UI Update Functions (mostly triggered by Firestore listeners now) ---
 
 /**
  * Updates the dashboard with current balance, income, and expenses.
@@ -449,7 +536,7 @@ function updateRecentTransactions() {
     const recent = transactions.slice(0, 5); // Show only the 5 most recent
 
     if (recent.length === 0) {
-        recentContainer.innerHTML = '<p style="text-align: center; color: #64748b; padding: 20px;">No transactions yet. Add your first transaction above!</p>';
+        recentContainer.innerHTML = '<p style="text-align: center; color: #bdc3c7; padding: 20px;">No transactions yet. Add your first transaction above!</p>';
         return;
     }
 
@@ -461,7 +548,7 @@ function updateRecentTransactions() {
             </div>
             <div class="transaction-amount ${transaction.type}">
                 ${transaction.type === 'income' ? '+' : '-'}$${transaction.amount.toFixed(2)}
-                <button class="delete-btn" onclick="deleteTransaction(${transaction.id})">Delete</button>
+                <button class="delete-btn" onclick="deleteTransaction('${transaction.id}')">Delete</button>
             </div>
         </div>
     `).join('');
@@ -474,7 +561,7 @@ function updateTransactionsList() {
     const container = document.getElementById('allTransactions');
     
     if (transactions.length === 0) {
-        container.innerHTML = '<p style="text-align: center; color: #64748b; padding: 20px;">No transactions yet.</p>';
+        container.innerHTML = '<p style="text-align: center; color: #bdc3c7; padding: 20px;">No transactions yet.</p>';
         return;
     }
 
@@ -486,7 +573,7 @@ function updateTransactionsList() {
             </div>
             <div class="transaction-amount ${transaction.type}">
                 ${transaction.type === 'income' ? '+' : '-'}$${transaction.amount.toFixed(2)}
-                <button class="delete-btn" onclick="deleteTransaction(${transaction.id})">Delete</button>
+                <button class="delete-btn" onclick="deleteTransaction('${transaction.id}')">Delete</button>
             </div>
         </div>
     `).join('');
@@ -497,12 +584,9 @@ function updateTransactionsList() {
  */
 function updateBudgetsList() {
     const container = document.getElementById('budgetsList');
-    // Note: Current month/year filtering is not applied here,
-    // budgets are shown regardless of the month they were set for simplicity.
-    // You might want to enhance this to show only current month's budgets.
 
     if (budgets.length === 0) {
-        container.innerHTML = '<p style="text-align: center; color: #64748b; padding: 20px;">No budgets set yet.</p>';
+        container.innerHTML = '<p style="text-align: center; color: #bdc3c7; padding: 20px;">No budgets set yet.</p>';
         return;
     }
 
@@ -519,13 +603,13 @@ function updateBudgetsList() {
             <div class="goal-card">
                 <div style="display: flex; justify-content: space-between; align-items: center;">
                     <h3>${budget.category}</h3>
-                    <button class="delete-btn" onclick="deleteBudget(${budget.id})">Delete</button>
+                    <button class="delete-btn" onclick="deleteBudget('${budget.id}')">Delete</button>
                 </div>
                 <p>Budget: $${budget.amount.toFixed(2)} | Spent: $${spent.toFixed(2)} | Remaining: $${remaining.toFixed(2)}</p>
                 <div class="goal-progress">
                     <div class="goal-progress-bar" style="width: ${Math.min(percentage, 100)}%"></div>
                 </div>
-                <p style="font-size: 14px; color: ${percentage > 100 ? '#ef4444' : '#64748b'};">
+                <p style="font-size: 14px; color: ${percentage > 100 ? '#e74c3c' : '#bdc3c7'};">
                     ${percentage.toFixed(1)}% used
                 </p>
             </div>
@@ -540,7 +624,7 @@ function updateGoalsList() {
     const container = document.getElementById('goalsList');
 
     if (goals.length === 0) {
-        container.innerHTML = '<div class="section-card"><p style="text-align: center; color: #64748b;">No goals set yet.</p></div>';
+        container.innerHTML = '<div class="section-card"><p style="text-align: center; color: #bdc3c7;">No goals set yet.</p></div>';
         return;
     }
 
@@ -552,17 +636,17 @@ function updateGoalsList() {
             <div class="goal-card">
                 <div style="display: flex; justify-content: space-between; align-items: center;">
                     <h3>${goal.name}</h3>
-                    <button class="delete-btn" onclick="deleteGoal(${goal.id})">Delete</button>
+                    <button class="delete-btn" onclick="deleteGoal('${goal.id}')">Delete</button>
                 </div>
                 <p>Target: $${goal.targetAmount.toFixed(2)} | Saved: $${goal.currentAmount.toFixed(2)}</p>
                 <p>Deadline: ${goal.deadline}</p>
                 <div class="goal-progress">
                     <div class="goal-progress-bar" style="width: ${Math.min(percentage, 100)}%"></div>
                 </div>
-                <p style="font-size: 14px; color: #64748b;">${percentage.toFixed(1)}% complete</p>
+                <p style="font-size: 14px; color: #bdc3c7;">${percentage.toFixed(1)}% complete</p>
                 <div style="margin-top: 15px;">
-                    <input type="number" id="goalAdd${goal.id}" placeholder="Add amount" step="0.01" style="padding: 8px; border: 1px solid #e2e8f0; border-radius: 6px; margin-right: 10px;">
-                    <button class="btn-primary" style="padding: 8px 16px; font-size: 14px;" onclick="addToGoal(${goal.id}, parseFloat(document.getElementById('goalAdd${goal.id}').value) || 0); document.getElementById('goalAdd${goal.id}').value = '';">Add</button>
+                    <input type="number" id="goalAdd${goal.id}" placeholder="Add amount" step="0.01" style="padding: 8px; border: 1px solid #34495e; border-radius: 6px; margin-right: 10px; background-color: #1a1a2e; color: #ecf0f1;">
+                    <button class="btn-primary" style="padding: 8px 16px; font-size: 14px;" onclick="addToGoal('${goal.id}', parseFloat(document.getElementById('goalAdd${goal.id}').value) || 0); document.getElementById('goalAdd${goal.id}').value = '';">Add</button>
                 </div>
             </div>
         `;
@@ -642,11 +726,11 @@ function createExpenseChart() {
                 datasets: [{
                     data: data,
                     backgroundColor: [
-                        '#667eea', '#764ba2', '#f093fb', '#f5576c',
-                        '#4facfe', '#00f2fe', '#43e97b', '#38f9d7'
+                        '#9b59b6', '#8e44ad', '#6c5ce7', '#e74c3c',
+                        '#3498db', '#1abc9c', '#f1c40f', '#95a5a6'
                     ],
                     borderWidth: 3,
-                    borderColor: '#ffffff',
+                    borderColor: '#2c2c4a', /* Card background color */
                     hoverBorderWidth: 4
                 }]
             },
@@ -663,7 +747,8 @@ function createExpenseChart() {
                             font: {
                                 size: 14,
                                 weight: '500'
-                            }
+                            },
+                            color: '#ecf0f1' /* Light text for legend */
                         }
                     },
                     tooltip: {
@@ -671,7 +756,7 @@ function createExpenseChart() {
                         backgroundColor: 'rgba(0,0,0,0.8)',
                         titleColor: '#ffffff',
                         bodyColor: '#ffffff',
-                        borderColor: '#667eea',
+                        borderColor: '#9b59b6',
                         borderWidth: 1,
                         callbacks: {
                             label: function(context) {
@@ -750,12 +835,12 @@ function createIncomeExpenseChart() {
                 labels: months,
                 datasets: [{
                     label: 'Income',
-                    borderColor: '#10b981',
-                    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                    borderColor: '#2ecc71', /* Brighter green */
+                    backgroundColor: 'rgba(46, 204, 113, 0.1)',
                     tension: 0.4,
                     fill: true,
-                    pointBackgroundColor: '#10b981',
-                    pointBorderColor: '#ffffff',
+                    pointBackgroundColor: '#2ecc71',
+                    pointBorderColor: '#2c2c4a', /* Card background color */
                     pointBorderWidth: 3,
                     pointRadius: 6,
                     pointHoverRadius: 8,
@@ -764,12 +849,12 @@ function createIncomeExpenseChart() {
                 }, {
                     label: 'Expenses',
                     data: expenseData,
-                    borderColor: '#ef4444',
-                    backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                    borderColor: '#e74c3c', /* Brighter red */
+                    backgroundColor: 'rgba(231, 76, 60, 0.1)',
                     tension: 0.4,
                     fill: true,
-                    pointBackgroundColor: '#ef4444',
-                    pointBorderColor: '#ffffff',
+                    pointBackgroundColor: '#e74c3c',
+                    pointBorderColor: '#2c2c4a', /* Card background color */
                     pointBorderWidth: 3,
                     pointRadius: 6,
                     pointHoverRadius: 8,
@@ -793,7 +878,8 @@ function createIncomeExpenseChart() {
                             font: {
                                 size: 14,
                                 weight: '600'
-                            }
+                            },
+                            color: '#ecf0f1' /* Light text for legend */
                         }
                     },
                     tooltip: {
@@ -801,7 +887,7 @@ function createIncomeExpenseChart() {
                         backgroundColor: 'rgba(0,0,0,0.8)',
                         titleColor: '#ffffff',
                         bodyColor: '#ffffff',
-                        borderColor: '#667eea',
+                        borderColor: '#9b59b6',
                         borderWidth: 1,
                         callbacks: {
                             label: function(context) {
@@ -816,7 +902,7 @@ function createIncomeExpenseChart() {
                         display: true,
                         grid: {
                             display: true,
-                            color: 'rgba(0,0,0,0.1)',
+                            color: 'rgba(255,255,255,0.1)', /* Lighter grid lines */
                             drawBorder: true,
                             lineWidth: 1
                         },
@@ -828,7 +914,7 @@ function createIncomeExpenseChart() {
                             font: {
                                 size: 12
                             },
-                            color: '#64748b'
+                            color: '#bdc3c7' /* Light grey tick labels */
                         },
                         title: {
                             display: true,
@@ -837,14 +923,14 @@ function createIncomeExpenseChart() {
                                 size: 14,
                                 weight: '600'
                             },
-                            color: '#1e293b'
+                            color: '#ecf0f1' /* Light text for axis title */
                         }
                     },
                     x: {
                         display: true,
                         grid: {
                             display: true,
-                            color: 'rgba(0,0,0,0.1)',
+                            color: 'rgba(255,255,255,0.1)', /* Lighter grid lines */
                             drawBorder: true,
                             lineWidth: 1
                         },
@@ -853,7 +939,7 @@ function createIncomeExpenseChart() {
                             font: {
                                 size: 12
                             },
-                            color: '#64748b'
+                            color: '#bdc3c7' /* Light grey tick labels */
                         },
                         title: {
                             display: true,
@@ -862,7 +948,7 @@ function createIncomeExpenseChart() {
                                 size: 14,
                                 weight: '600'
                             },
-                            color: '#1e293b'
+                            color: '#ecf0f1' /* Light text for axis title */
                         }
                     }
                 },
@@ -909,30 +995,34 @@ function closeMobileMenu() {
 
 // --- Parallax Effect for Mouse Movement ---
 document.addEventListener('mousemove', (e) => {
-    // Select elements that should have the parallax effect
-    const parallaxElements = document.querySelectorAll('.login-form, .stat-card, .section-card, .goal-card');
+    // Select only buttons and the sidebar for the parallax effect
+    const parallaxElements = document.querySelectorAll('.btn, .btn-secondary, .btn-primary, .logout-btn, .mobile-menu-btn, .sidebar');
 
     const mouseX = e.clientX;
     const mouseY = e.clientY;
 
-    const centerX = window.innerWidth / 2;
-    const centerY = window.innerHeight / 2;
-
     parallaxElements.forEach(element => {
-        // Calculate offset relative to the center of the element itself
-        // This makes the movement relative to the element's position, not the whole window
+        // Get the element's position and dimensions relative to the viewport
         const rect = element.getBoundingClientRect();
         const elementCenterX = rect.left + rect.width / 2;
         const elementCenterY = rect.top + rect.height / 2;
 
-        const offsetX = (mouseX - elementCenterX) * 0.01; // Adjust multiplier for intensity
-        const offsetY = (mouseY - elementCenterY) * 0.01; // Adjust multiplier for intensity
+        // Calculate distance from mouse to center of the element
+        const distanceX = mouseX - elementCenterX;
+        const distanceY = mouseY - elementCenterY;
 
+        // Apply a small translation. Adjust the multiplier (e.g., 0.005 to 0.02) for intensity.
+        // Smaller multiplier for less movement.
+        const intensity = 0.005; // Adjust this value for desired effect strength
+        const offsetX = distanceX * intensity; 
+        const offsetY = distanceY * intensity; 
+
+        // Apply the transform
         element.style.transform = `translate(${offsetX}px, ${offsetY}px)`;
     });
 });
 
-// Removed body style manipulation as it's now handled by CSS and individual elements
+// No need for body style manipulation for this type of parallax effect
 // document.body.style.width = '100vw';
 // document.body.style.height = '100vh';
 // document.body.style.overflow = 'hidden';
