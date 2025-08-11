@@ -8,6 +8,46 @@
     <link rel="stylesheet" href="style.css">
     <!-- Chart.js library for graphs -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Firebase SDK Imports -->
+    <script type="module">
+        // Import the functions you need from the SDKs you need
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, doc, getDoc, setDoc, addDoc, updateDoc, deleteDoc, onSnapshot, query, where } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // Firebase configuration (will be provided by the environment)
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        // Make Firebase instances and global variables available to the script.js
+        window.firebaseApp = app;
+        window.firebaseAuth = auth;
+        window.firebaseDb = db;
+        window.initialAuthToken = initialAuthToken;
+        window.appId = appId;
+        window.onAuthStateChanged = onAuthStateChanged;
+        window.signInAnonymously = signInAnonymously;
+        window.signInWithCustomToken = signInWithCustomToken;
+        window.createUserWithEmailAndPassword = createUserWithEmailAndPassword;
+        window.signInWithEmailAndPassword = signInWithEmailAndPassword;
+        window.signOut = signOut;
+        window.collection = collection;
+        window.doc = doc;
+        window.getDoc = getDoc;
+        window.setDoc = setDoc;
+        window.addDoc = addDoc;
+        window.updateDoc = updateDoc;
+        window.deleteDoc = deleteDoc;
+        window.onSnapshot = onSnapshot;
+        window.query = query;
+        window.where = where;
+    </script>
 </head>
 <body>
     <!-- Login Screen -->
@@ -16,8 +56,8 @@
             <h1>Finovate</h1>
             <div id="loginForm">
                 <div class="form-group">
-                    <label for="loginUsername">Username</label>
-                    <input type="text" id="loginUsername" placeholder="Enter your username">
+                    <label for="loginEmail">Email</label>
+                    <input type="email" id="loginEmail" placeholder="Enter your email">
                 </div>
                 <div class="form-group">
                     <label for="loginPassword">Password</label>
@@ -29,16 +69,16 @@
             
             <div id="signupForm" style="display: none;">
                 <div class="form-group">
-                    <label for="signupUsername">Username</label>
-                    <input type="text" id="signupUsername" placeholder="Choose a username">
-                </div>
-                <div class="form-group">
-                    <label for="signupPassword">Password</label>
-                    <input type="password" id="signupPassword" placeholder="Choose a password">
+                    <label for="signupUsername">Display Name</label>
+                    <input type="text" id="signupUsername" placeholder="Choose a display name">
                 </div>
                 <div class="form-group">
                     <label for="signupEmail">Email</label>
                     <input type="email" id="signupEmail" placeholder="Enter your email">
+                </div>
+                <div class="form-group">
+                    <label for="signupPassword">Password</label>
+                    <input type="password" id="signupPassword" placeholder="Choose a password">
                 </div>
                 <button class="btn" onclick="signup()">Create Account</button>
                 <button class="btn btn-secondary" onclick="showLogin()">Back to Sign In</button>
@@ -81,6 +121,7 @@
                     <a href="#" class="nav-link" onclick="showSection('reports', event)">
                         <span>📋</span><span>Reports</span>
                     </a>
+                </a>
                 </li>
             </ul>
         </nav>
@@ -118,7 +159,7 @@
 
                 <div class="section-card">
                     <h2 class="section-title">Add Income</h2>
-                    <p style="color: #64748b; margin-bottom: 15px;">Add income to increase your balance. Expenses will automatically reduce your balance.</p>
+                    <p style="color: #bdc3c7; margin-bottom: 15px;">Add income to increase your balance. Expenses will automatically reduce your balance.</p>
                     <div class="form-row">
                         <input type="number" id="incomeAmount" class="form-control" placeholder="Income Amount" step="0.01">
                         <input type="text" id="incomeSource" class="form-control" placeholder="Income Source (e.g., Salary, Freelance, Gift)">
